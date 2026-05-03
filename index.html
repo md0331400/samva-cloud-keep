@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>CloudKeep - Beautiful Notes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    :root {
+      --bg-page: #f5f7fb;
+      --bg-surface: #ffffff;
+      --text-primary: #1e293b;
+      --text-secondary: #475569;
+      --border-light: #e2e8f0;
+      --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      --card-hover: 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --gradient-btn: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      --sidebar-bg: rgba(255, 255, 255, 0.95);
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    body.dark {
+      --bg-page: #0f172a;
+      --bg-surface: #1e293b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border-light: #334155;
+      --sidebar-bg: rgba(15, 23, 42, 0.98);
+    }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text-primary);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* Splash Screen */
+    .splash {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(145deg, #3b82f6, #8b5cf6, #ec4899);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      animation: fadeOut 0.8s ease forwards 2.2s;
+      pointer-events: none;
+    }
+
+    .splash-logo {
+      text-align: center;
+      animation: zoomFade 0.6s ease;
+    }
+
+    .splash-logo i {
+      font-size: 5rem;
+      color: white;
+      margin-bottom: 1rem;
+    }
+
+    .splash h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.02em;
+    }
+
+    .splash p {
+      margin-top: 1rem;
+      color: rgba(255,255,255,0.9);
+      font-weight: 500;
+      animation: fadeUp 0.5s ease 0.3s both;
+    }
+
+    @keyframes zoomFade {
+      0% { opacity: 0; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; visibility: hidden; }
+    }
+
+    /* Offline Banner - Compact */
+    .offline-banner {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      color: white;
+      text-align: center;
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      display: none;
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+      animation: slideDown 0.3s ease;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    @keyframes slideDown {
+      from { transform: translateY(-100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .offline-banner i {
+      font-size: 0.7rem;
+    }
+
+    .offline-banner strong {
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .offline-banner button {
+      background: white;
+      border: none;
+      padding: 3px 8px;
+      margin-left: 5px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.65rem;
+      color: #dc2626;
+      transition: transform 0.2s;
+    }
+
+    .offline-banner button:hover {
+      transform: scale(1.05);
+    }
+
+    .offline-banner button i {
+      font-size: 0.6rem;
+      margin-right: 2px;
+    }
+
+    /* Sync Status */
+    .sync-status {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      background: var(--bg-surface);
+      padding: 6px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      box-shadow: var(--card-shadow);
+      border: 1px solid var(--border-light);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-direction: column;
+      align-items: flex-start;
+      min-width: 140px;
+    }
+
+    .sync-status:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .sync-status:active {
+      transform: scale(0.98);
+    }
+
+    .sync-status .sync-main {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .sync-status .last-sync-time {
+      font-size: 0.6rem;
+      opacity: 0.7;
+      margin-top: 2px;
+      padding-left: 22px;
+    }
+
+    .sync-status.synced { color: var(--success); border-left: 3px solid var(--success); }
+    .sync-status.pending { color: var(--warning); border-left: 3px solid var(--warning); }
+    .sync-status.syncing { color: var(--accent-blue); border-left: 3px solid var(--accent-blue); }
+    .sync-status.error { color: var(--error); border-left: 3px solid var(--error); }
+
+    .sync-status.syncing i {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Custom Dialog */
+    .custom-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10001;
+    }
+
+    .custom-dialog {
+      background: var(--bg-surface);
+      border-radius: 32px;
+      width: 90%;
+      max-width: 400px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .custom-dialog i {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .custom-dialog.warning i { color: var(--warning); }
+    .custom-dialog.danger i { color: var(--error); }
+    .custom-dialog.info i { color: var(--accent-blue); }
+
+    .custom-dialog h3 {
+      font-size: 1.5rem;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .custom-dialog p {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .dialog-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .dialog-buttons button {
+      padding: 10px 24px;
+      border-radius: 40px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .dialog-buttons .confirm-btn {
+      background: var(--gradient-btn);
+      color: white;
+    }
+
+    .dialog-buttons .cancel-btn {
+      background: var(--bg-page);
+      color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+
+    .dialog-buttons .danger-btn {
+      background: var(--error);
+      color: white;
+    }
+
+    /* Auth */
+    .auth-wrapper {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-page);
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .auth-container {
+      max-width: 460px;
+      width: 100%;
+      background: var(--bg-surface);
+      border-radius: 2rem;
+      padding: 2rem;
+      box-shadow: var(--card-shadow);
+      border: 1px solid var(--border-light);
+    }
+
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .auth-logo i {
+      font-size: 3rem;
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .auth-logo h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .auth-container input {
+      width: 100%;
+      padding: 12px 18px;
+      margin: 10px 0;
+      border-radius: 40px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+
+    .auth-container input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+
+    .auth-container button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 40px;
+      background: var(--gradient-btn);
+      border: none;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    .auth-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+      font-size: 0.85rem;
+    }
+    .auth-footer span {
+      color: var(--accent-blue);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    /* Main App */
+    .app-main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px 24px 80px;
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .menu-icon {
+      font-size: 1.8rem;
+      cursor: pointer;
+      background: var(--bg-surface);
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      box-shadow: var(--card-shadow);
+    }
+
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-surface);
+      padding: 8px 18px;
+      border-radius: 40px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .app-logo i {
+      font-size: 1.5rem;
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .app-logo span {
+      font-weight: 700;
+      font-size: 1.2rem;
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 500px;
+      position: relative;
+    }
+
+    .search-box i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border-radius: 48px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .note-card {
+      background: var(--bg-surface);
+      border-radius: 24px;
+      padding: 1.2rem;
+      box-shadow: var(--card-shadow);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid var(--border-light);
+      transform: translateZ(0);
+    }
+
+    .note-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--card-hover);
+    }
+
+    .pin-icon {
+      float: right;
+      color: #f59e0b;
+    }
+
+    .note-title {
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+      padding-right: 28px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .note-preview {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .note-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 14px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .card-actions i {
+      margin-left: 12px;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: 0.2s;
+    }
+    .card-actions i:hover { opacity: 1; }
+
+    .fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 60px;
+      height: 60px;
+      background: var(--gradient-btn);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: transform 0.2s;
+      z-index: 15;
+    }
+    .fab i { color: white; font-size: 28px; }
+    .fab:hover { transform: scale(1.05); }
+
+    /* Note Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      justify-content: center;
+      align-items: center;
+      z-index: 1100;
+    }
+    .modal-content {
+      background: var(--bg-surface);
+      width: 90%;
+      max-width: 700px;
+      border-radius: 32px;
+      padding: 28px;
+    }
+    .modal-content input, .modal-content textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 12px 0;
+      font-size: 1rem;
+      color: var(--text-primary);
+      outline: none;
+    }
+    .modal-content input { font-size: 1.6rem; font-weight: 600; }
+    .modal-content textarea { min-height: 200px; resize: vertical; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+    .modal-actions button { padding: 8px 24px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
+    .save-btn { background: var(--accent-blue); color: white; }
+    .cancel-modal-btn { background: var(--bg-page); color: var(--text-primary); border: 1px solid var(--border-light); }
+
+    /* Sidebar */
+    .sidebar-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(2px);
+      visibility: hidden;
+      opacity: 0;
+      transition: 0.3s;
+      z-index: 1000;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0; left: -280px;
+      width: 280px;
+      height: 100%;
+      background: var(--sidebar-bg);
+      backdrop-filter: blur(16px);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+      transition: left 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+      z-index: 1001;
+      padding: 28px 16px;
+    }
+    .sidebar.open { left: 0; }
+    .sidebar-overlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      margin: 8px 0;
+      border-radius: 40px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: 0.2s;
+      color: var(--text-primary);
+    }
+    .sidebar-item:hover { background: rgba(59,130,246,0.15); }
+    .sidebar-item i { width: 24px; }
+    .theme-toggle-sidebar {
+      margin-top: 24px;
+      border-top: 1px solid var(--border-light);
+      padding-top: 20px;
+    }
+    .close-sidebar-btn {
+      text-align: right;
+      font-size: 1.4rem;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    /* Settings */
+    .settings-card {
+      background: var(--bg-surface);
+      border-radius: 32px;
+      padding: 2rem;
+      max-width: 600px;
+      margin: 40px auto;
+      box-shadow: var(--card-shadow);
+    }
+    .info-row {
+      background: var(--bg-page);
+      padding: 16px;
+      border-radius: 28px;
+      margin: 20px 0;
+    }
+    .password-section {
+      margin-top: 28px;
+    }
+    .password-section input {
+      width: 100%;
+      padding: 12px 16px;
+      margin: 8px 0;
+      border-radius: 40px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-page);
+      color: var(--text-primary);
+    }
+    .password-section button {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .message {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 40px;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    .success { background: var(--success); color: white; }
+    .error { background: var(--error); color: white; }
+    .danger-btn {
+      background: #dc2626 !important;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 40px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .empty-state { text-align: center; margin-top: 80px; opacity: 0.7; }
+    @media (max-width: 640px) { 
+      .app-main { padding: 16px; } 
+      .note-card { padding: 1rem; }
+      .offline-banner { padding: 6px 10px; font-size: 0.65rem; }
+      .offline-banner button { padding: 2px 6px; font-size: 0.6rem; }
+    }
+    
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid var(--border-light);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+<div id="splash" class="splash">
+  <div class="splash-logo">
+    <i class="fas fa-cloud"></i>
+    <h1>CloudKeep</h1>
+  </div>
+  <p>Created by ami sayem</p>
+</div>
+
+<div id="offlineBanner" class="offline-banner">
+  <i class="fas fa-wifi-slash"></i> 
+  <span>🔴 Offline — নোট লোকালি সেভ হচ্ছে</span>
+  
+</div>
+
+<div id="syncStatus" class="sync-status synced" onclick="window.manualRefresh && window.manualRefresh()" title="Click to sync to Firestore">
+  <div class="sync-main">
+    <i class="fas fa-check-circle"></i>
+    <span id="syncText">All synced</span>
+  </div>
+  <div class="last-sync-time" id="lastSyncTime">Last sync: Just now</div>
+</div>
+
+<div id="customDialog" class="custom-dialog-overlay">
+  <div class="custom-dialog">
+    <i class="fas fa-question-circle"></i>
+    <h3 id="dialogTitle">Are you sure?</h3>
+    <p id="dialogMessage">This action cannot be undone.</p>
+    <div class="dialog-buttons">
+      <button class="cancel-btn" onclick="window.hideDialog && window.hideDialog()">Cancel</button>
+      <button id="dialogConfirmBtn" class="confirm-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot"><div class="loading-container"><div class="spinner"></div></div></div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCr8RI1wb80V4uh2nKTEltn7GS9JgusF_4",
+    authDomain: "sam-simple-notebook.firebaseapp.com",
+    projectId: "sam-simple-notebook",
+    storageBucket: "sam-simple-notebook.firebasestorage.app",
+    messagingSenderId: "671249382181",
+    appId: "1:671249382181:web:3381f0fe336aa5f63438cc"
+  };
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // ✅ Enable offline persistence (IndexedDB cache)
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(() => console.log('✅ Offline persistence enabled'))
+    .catch((err) => console.warn('⚠️ Persistence error:', err.code));
+
+  // ─── LOCAL STORAGE KEYS ──────────────────────────────────────────
+  const LOCAL_NOTES_KEY = 'cloudkeep_local_notes';
+  const PENDING_OPS_KEY = 'cloudkeep_pending_ops';
+
+  // ─── LOCAL STORAGE HELPERS ───────────────────────────────────────
+  function getLocalNotes() {
+    try { return JSON.parse(localStorage.getItem(LOCAL_NOTES_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function saveLocalNotes(arr) {
+    localStorage.setItem(LOCAL_NOTES_KEY, JSON.stringify(arr));
+  }
+  function getPendingOps() {
+    try { return JSON.parse(localStorage.getItem(PENDING_OPS_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function savePendingOps(ops) {
+    localStorage.setItem(PENDING_OPS_KEY, JSON.stringify(ops));
+  }
+  function addPendingOp(op) {
+    const ops = getPendingOps();
+    const idx = ops.findIndex(o => o.id === op.id && o.type !== 'delete');
+    if (op.type === 'delete') {
+      savePendingOps([...ops.filter(o => o.id !== op.id), op]);
+    } else if (idx >= 0 && ops[idx].type !== 'delete') {
+      ops[idx] = { ...ops[idx], ...op, data: { ...ops[idx].data, ...op.data } };
+      savePendingOps(ops);
+    } else {
+      savePendingOps([...ops, op]);
+    }
+    updateSyncBadge();
+  }
+  function removePendingOp(id) {
+    savePendingOps(getPendingOps().filter(o => o.id !== id));
+    updateSyncBadge();
+  }
+
+  // ─── SYNC BADGE ──────────────────────────────────────────────────
+  function updateSyncBadge() {
+    const count = getPendingOps().length;
+    const syncDiv = document.getElementById('syncStatus');
+    const syncText = document.getElementById('syncText');
+    if (!syncDiv || !syncText) return;
+    if (!navigator.onLine) {
+      syncDiv.className = 'sync-status pending';
+      syncText.innerHTML = '<i class="fas fa-wifi-slash"></i> Offline mode';
+      document.getElementById('lastSyncTime').textContent = `${count} unsynced change(s)`;
+      return;
+    }
+    if (count > 0) {
+      syncDiv.className = 'sync-status pending';
+      syncText.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> ${count} unsynced`;
+      document.getElementById('lastSyncTime').textContent = 'Click to sync to cloud';
+    } else {
+      syncDiv.className = 'sync-status synced';
+      syncText.innerHTML = '<i class="fas fa-check-circle"></i> All synced';
+      const lastSyncElem = document.getElementById('lastSyncTime');
+      if (lastSyncElem && lastSyncTimestamp) {
+        const d = new Date(lastSyncTimestamp);
+        const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        lastSyncElem.textContent = `Last sync: ${timeStr}`;
+      }
+    }
+  }
+
+  let lastSyncTimestamp = Date.now();
+  let searchTimeout = null;
+  let unsubscribeNotes = null;
+  let isCreating = false;
+  
+  function updateLastSyncTime() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr = now.toLocaleDateString();
+    const lastSyncElem = document.getElementById('lastSyncTime');
+    if (lastSyncElem) lastSyncElem.innerHTML = `Last sync: ${dateStr} ${timeStr}`;
+    lastSyncTimestamp = Date.now();
+  }
+  
+  function showSyncingStatus() {
+    const syncDiv = document.getElementById('syncStatus');
+    const syncText = document.getElementById('syncText');
+    if (syncDiv && syncText) {
+      syncDiv.className = 'sync-status syncing';
+      syncText.innerHTML = '<i class="fas fa-sync-alt"></i> Syncing...';
+    }
+  }
+  
+  function showSyncComplete() {
+    const syncDiv = document.getElementById('syncStatus');
+    const syncText = document.getElementById('syncText');
+    if (syncDiv && syncText) {
+      syncDiv.className = 'sync-status synced';
+      syncText.innerHTML = '<i class="fas fa-check-circle"></i> All synced';
+      updateLastSyncTime();
+    }
+  }
+
+  function showSyncError() {
+    const syncDiv = document.getElementById('syncStatus');
+    const syncText = document.getElementById('syncText');
+    if (syncDiv && syncText) {
+      syncDiv.className = 'sync-status error';
+      syncText.innerHTML = '<i class="fas fa-exclamation-circle"></i> Sync failed';
+    }
+  }
+
+  // ─── MANUAL SYNC (fires all pending ops to Firestore) ─────────────
+  window.manualRefresh = async function() {
+    if (!navigator.onLine) {
+      showToast('📡 No internet connection!', 'error');
+      return;
+    }
+    if (!currentUser) {
+      showToast('⚠️ Please log in first', 'error');
+      return;
+    }
+
+    const ops = getPendingOps();
+    if (ops.length === 0) {
+      showSyncComplete();
+      showToast('✅ Already synced!', 'success');
+      return;
+    }
+
+    showSyncingStatus();
+    showToast(`⏳ Syncing ${ops.length} change(s)...`, 'success');
+
+    const notesRef = (id) => db.collection('users').doc(currentUser.uid).collection('notes').doc(id);
+    let failed = 0;
+
+    for (const op of ops) {
+      try {
+        if (op.type === 'delete') {
+          await notesRef(op.id).delete();
+        } else if (op.type === 'set') {
+          // 🔧 BUG FIX: Remove local updatedAt before setting server timestamp
+          const data = { ...op.data };
+          delete data.updatedAt;
+          data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+          await notesRef(op.id).set(data);
+        } else if (op.type === 'update') {
+          // 🔧 BUG FIX: Remove local updatedAt before setting server timestamp
+          const data = { ...op.data };
+          delete data.updatedAt;
+          data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+          await notesRef(op.id).set(data, { merge: true });
+        }
+        removePendingOp(op.id);
+      } catch (err) {
+        console.error('Sync op failed:', op.id, err);
+        failed++;
+      }
+    }
+
+    if (failed === 0) {
+      showSyncComplete();
+      showToast('✅ All synced to cloud!', 'success');
+      await pullFromFirestore();
+    } else {
+      showSyncError();
+      showToast(`❌ ${failed} item(s) failed to sync`, 'error');
+    }
+    updateSyncBadge();
+  };
+
+  // Pull latest notes from Firestore into localNotes
+  async function pullFromFirestore() {
+    if (!currentUser || !navigator.onLine) return;
+    try {
+      const snap = await db.collection('users').doc(currentUser.uid).collection('notes')
+        .orderBy('updatedAt', 'desc').get({ source: 'server' });
+      const notes = [];
+      snap.forEach(doc => notes.push({ id: doc.id, ...doc.data(), updatedAt: doc.data().updatedAt?.toMillis?.() || Date.now() }));
+      saveLocalNotes(notes);
+      notesArray = notes;
+      renderCurrentView();
+    } catch (err) {
+      console.warn('Pull from Firestore failed:', err);
+    }
+  }
+
+  function updateConnectionStatus() {
+    const offlineBanner = document.getElementById('offlineBanner');
+    if (!navigator.onLine) {
+      if (offlineBanner) offlineBanner.style.display = 'flex';
+    } else {
+      if (offlineBanner) offlineBanner.style.display = 'none';
+    }
+    updateSyncBadge();
+  }
+
+  let pendingDialogCallback = null;
+  
+  window.showDialog = function(options) {
+    const dialog = document.getElementById('customDialog');
+    if (!dialog) return;
+    
+    const icon = dialog.querySelector('i');
+    const title = document.getElementById('dialogTitle');
+    const message = document.getElementById('dialogMessage');
+    const confirmBtn = document.getElementById('dialogConfirmBtn');
+    
+    if (!icon || !title || !message || !confirmBtn) return;
+    
+    icon.className = '';
+    if (options.type === 'warning') {
+      icon.className = 'fas fa-exclamation-triangle';
+      dialog.querySelector('.custom-dialog').className = 'custom-dialog warning';
+    } else if (options.type === 'danger') {
+      icon.className = 'fas fa-trash-alt';
+      dialog.querySelector('.custom-dialog').className = 'custom-dialog danger';
+    } else {
+      icon.className = 'fas fa-question-circle';
+      dialog.querySelector('.custom-dialog').className = 'custom-dialog';
+    }
+    
+    title.textContent = options.title || 'Are you sure?';
+    message.textContent = options.message || 'This action cannot be undone.';
+    confirmBtn.textContent = options.confirmText || 'Confirm';
+    
+    if (options.danger) confirmBtn.className = 'danger-btn';
+    else confirmBtn.className = 'confirm-btn';
+    
+    pendingDialogCallback = options.onConfirm;
+    dialog.style.display = 'flex';
+    
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.onclick = () => {
+      if (pendingDialogCallback) pendingDialogCallback();
+      window.hideDialog();
+    };
+  };
+  
+  window.hideDialog = function() {
+    document.getElementById('customDialog').style.display = 'none';
+    pendingDialogCallback = null;
+  };
+  
+  window.customConfirm = (message, title, type = 'warning') => {
+    return new Promise((resolve) => {
+      window.showDialog({
+        title: title || 'Confirm',
+        message: message,
+        type: type,
+        onConfirm: () => resolve(true),
+        confirmText: 'Yes'
+      });
+      const cancelBtn = document.querySelector('#customDialog .cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.onclick = () => {
+          resolve(false);
+          window.hideDialog();
+        };
+      }
+    });
+  };
+
+  // ─── CONNECTION LISTENERS ─────────────────────────────────────────
+  window.addEventListener('online', () => {
+    updateConnectionStatus();
+    showToast('🟢 Online! Click sync button to upload changes.', 'success');
+  });
+  
+  window.addEventListener('offline', () => {
+    updateConnectionStatus();
+    showToast('🔴 You are offline. Notes saved locally.', 'error');
+  });
+  
+  function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.innerHTML = message;
+    toast.style.cssText = `
+      position: fixed; bottom: 100px; left: 20px;
+      background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#ef4444'};
+      color: white; padding: 10px 16px; border-radius: 40px;
+      font-size: 0.8rem; font-weight: 500; z-index: 10000;
+      animation: fadeSlide 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  let currentUser = null;
+  let currentView = 'notes';
+  let searchQuery = '';
+  let notesArray = [];
+  let editingNoteId = null;
+  let currentTheme = localStorage.getItem('theme') || 'light';
+
+  let rootEl;
+  
+  function applyTheme() {
+    if (currentTheme === 'dark') document.body.classList.add('dark');
+    else document.body.classList.remove('dark');
+  }
+  function setTheme(theme) { currentTheme = theme; localStorage.setItem('theme', theme); applyTheme(); }
+  function toggleTheme() { setTheme(currentTheme === 'light' ? 'dark' : 'light'); }
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function escapeHtml(str) { 
+    if(!str) return ''; 
+    return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+  }
+
+  function cleanup() {
+    if (unsubscribeNotes) {
+      unsubscribeNotes();
+      unsubscribeNotes = null;
+    }
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
+    }
+    cardEventListenerAttached = false;
+  }
+
+  function attachNotesListener() {
+    if (unsubscribeNotes) { unsubscribeNotes(); unsubscribeNotes = null; }
+    if (!currentUser) return;
+
+    // Load from local storage immediately (works offline)
+    const local = getLocalNotes();
+    if (local.length > 0) {
+      notesArray = local;
+      renderCurrentView();
+    }
+
+    // If online, pull fresh data from Firestore (read-only listener for display)
+    if (navigator.onLine) {
+      unsubscribeNotes = db.collection('users').doc(currentUser.uid).collection('notes')
+        .orderBy('updatedAt', 'desc')
+        .onSnapshot({ includeMetadataChanges: false }, snapshot => {
+          // 🔧 BUG FIX: Always sync with localStorage first before merging
+          const localNotes = getLocalNotes();
+          notesArray = localNotes;
+          
+          const pending = getPendingOps();
+          const pendingIds = new Set(pending.map(o => o.id));
+
+          const serverNotes = [];
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            serverNotes.push({ id: doc.id, ...data, updatedAt: data.updatedAt?.toMillis?.() || Date.now() });
+          });
+
+          // Merge: prefer local pending version for any pending id
+          const localPending = localNotes.filter(n => pendingIds.has(n.id));
+          const merged = serverNotes.map(n => {
+            if (pendingIds.has(n.id)) {
+              return localPending.find(l => l.id === n.id) || n;
+            }
+            return n;
+          });
+          // Add locally-created notes not yet in Firestore
+          const serverIds = new Set(serverNotes.map(n => n.id));
+          localPending.forEach(n => { if (!serverIds.has(n.id)) merged.push(n); });
+
+          notesArray = merged;
+          saveLocalNotes(merged);
+          renderCurrentView();
+          updateSyncBadge();
+        }, err => {
+          console.warn('Snapshot error:', err);
+          // Fallback to local
+          notesArray = getLocalNotes();
+          renderCurrentView();
+        });
+    }
+  }
+
+  function getFilteredNotes() {
+    let filtered = notesArray.filter(n => {
+      if (currentView === 'notes') return !n.isTrashed && !n.isArchived;
+      if (currentView === 'archive') return !n.isTrashed && n.isArchived === true;
+      if (currentView === 'trash') return n.isTrashed === true;
+      return false;
+    });
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(n => (n.title && n.title.toLowerCase().includes(q)) || (n.content && n.content.toLowerCase().includes(q)));
+    }
+    if (currentView === 'notes') filtered.sort((a,b) => (b.isPinned === true) - (a.isPinned === true));
+    return filtered;
+  }
+
+  function renderCurrentView() {
+    const mainContent = document.getElementById('mainContentArea');
+    if (!mainContent) return;
+    
+    if (currentView === 'settings') {
+      renderSettingsPanel(mainContent);
+      return;
+    }
+    
+    const filtered = getFilteredNotes();
+    let emptyMsg = '';
+    if (filtered.length === 0) {
+      if (currentView === 'notes') emptyMsg = '✨ No notes. Tap + to create';
+      else if (currentView === 'archive') emptyMsg = '📦 Archive is empty';
+      else emptyMsg = '🗑️ Trash is empty';
+    }
+    
+    mainContent.innerHTML = `
+      <div class="notes-grid">
+        ${filtered.map(note => `
+          <div class="note-card" data-id="${note.id}">
+            ${note.isPinned && currentView === 'notes' ? '<i class="fas fa-thumbtack pin-icon"></i>' : ''}
+            <div class="note-title">${escapeHtml(note.title) || 'Untitled'}</div>
+            <div class="note-preview">${escapeHtml((note.content || '').substring(0, 100))}${(note.content || '').length > 100 ? '…' : ''}</div>
+            <div class="note-meta">
+              <span>${formatDate(note.updatedAt)}</span>
+              <div class="card-actions">
+                ${currentView === 'notes' ? `
+                  <i class="fas fa-thumbtack pin-action" data-id="${note.id}" data-pinned="${note.isPinned}"></i>
+                  <i class="fas fa-archive archive-action" data-id="${note.id}" data-archived="${note.isArchived}"></i>
+                  <i class="fas fa-trash trash-action" data-id="${note.id}"></i>
+                ` : currentView === 'archive' ? `
+                  <i class="fas fa-inbox unarchive-action" data-id="${note.id}"></i>
+                  <i class="fas fa-trash trash-action" data-id="${note.id}"></i>
+                ` : currentView === 'trash' ? `
+                  <i class="fas fa-trash-restore restore-action" data-id="${note.id}"></i>
+                  <i class="fas fa-trash-alt perm-delete" data-id="${note.id}"></i>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${filtered.length === 0 ? `<div class="empty-state">${emptyMsg}</div>` : ''}
+    `;
+    attachCardEvents();
+  }
+
+  // 🔧 BUG FIX: Single delegated listener — attached once, handles all card events
+  let cardEventListenerAttached = false;
+  function attachCardEvents() {
+    const mainContent = document.getElementById('mainContentArea');
+    if (!mainContent || cardEventListenerAttached) return;
+    cardEventListenerAttached = true;
+
+    mainContent.addEventListener('click', async (e) => {
+      const card = e.target.closest('.note-card');
+      if (card && !e.target.closest('.card-actions')) {
+        const note = notesArray.find(n => n.id === card.dataset.id);
+        if (note) openEditModal(note);
+        return;
+      }
+
+      const pinIcon = e.target.closest('.pin-action');
+      if (pinIcon) {
+        e.stopPropagation();
+        const id = pinIcon.dataset.id;
+        const isPinned = pinIcon.dataset.pinned === 'true';
+        await updateNoteProp(id, { isPinned: !isPinned });
+        showToast(isPinned ? '📌 Unpinned' : '📌 Pinned', 'success');
+        return;
+      }
+
+      const archiveIcon = e.target.closest('.archive-action');
+      if (archiveIcon) {
+        e.stopPropagation();
+        const confirmed = await window.customConfirm('Archive this note?', 'Archive', 'info');
+        if (confirmed) await updateNoteProp(archiveIcon.dataset.id, { isArchived: true, isPinned: false });
+        return;
+      }
+
+      const unarchiveIcon = e.target.closest('.unarchive-action');
+      if (unarchiveIcon) {
+        e.stopPropagation();
+        const confirmed = await window.customConfirm('Move back to notes?', 'Unarchive', 'info');
+        if (confirmed) await updateNoteProp(unarchiveIcon.dataset.id, { isArchived: false });
+        return;
+      }
+
+      const trashIcon = e.target.closest('.trash-action');
+      if (trashIcon) {
+        e.stopPropagation();
+        const confirmed = await window.customConfirm('Move to trash?', 'Trash', 'warning');
+        if (confirmed) await updateNoteProp(trashIcon.dataset.id, { isTrashed: true, isArchived: false, isPinned: false });
+        return;
+      }
+
+      const restoreIcon = e.target.closest('.restore-action');
+      if (restoreIcon) {
+        e.stopPropagation();
+        const confirmed = await window.customConfirm('Restore this note?', 'Restore', 'info');
+        if (confirmed) await updateNoteProp(restoreIcon.dataset.id, { isTrashed: false });
+        return;
+      }
+
+      const permDeleteIcon = e.target.closest('.perm-delete');
+      if (permDeleteIcon) {
+        e.stopPropagation();
+        const confirmed = await window.customConfirm('Permanently delete?', 'Delete', 'danger');
+        if (confirmed) {
+          const id = permDeleteIcon.dataset.id;
+          const notes = getLocalNotes().filter(n => n.id !== id);
+          saveLocalNotes(notes);
+          notesArray = notes;
+          addPendingOp({ type: 'delete', id });
+          renderCurrentView();
+          updateSyncBadge();
+          showToast('⚠️ Deleted locally (sync to remove from cloud)', 'success');
+        }
+        return;
+      }
+    });
+  }
+
+  async function updateNoteProp(noteId, updates) {
+    if (!currentUser) return;
+
+    // Update local
+    const notes = getLocalNotes();
+    const idx = notes.findIndex(n => n.id === noteId);
+    if (idx >= 0) {
+      notes[idx] = { ...notes[idx], ...updates, updatedAt: Date.now() };
+      saveLocalNotes(notes);
+      notesArray = notes;
+    }
+
+    // 🔧 BUG FIX: Always queue the full updated note with all fields
+    if (idx >= 0) {
+      // Only send changed fields + updatedAt to avoid overwriting
+      const syncData = { ...updates, updatedAt: Date.now() };
+      addPendingOp({ type: 'update', id: noteId, data: syncData });
+    } else {
+      addPendingOp({ type: 'update', id: noteId, data: { ...updates, updatedAt: Date.now() } });
+    }
+
+    renderCurrentView();
+    updateSyncBadge();
+  }
+
+  // 🔧 BUG FIX: Generate Firestore-compatible random ID without network call
+  function generateLocalId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(20));
+    return Array.from(bytes, b => chars[b % chars.length]).join('');
+  }
+
+  async function createNewNote() {
+    if (!currentUser || isCreating) return;
+    isCreating = true;
+
+    try {
+      const newId = generateLocalId();
+      const now = Date.now();
+      const newNote = {
+        id: newId,
+        title: '',
+        content: '',
+        createdAt: now,
+        updatedAt: now,
+        isPinned: false,
+        isArchived: false,
+        isTrashed: false
+      };
+
+      const notes = getLocalNotes();
+      notes.unshift(newNote);
+      saveLocalNotes(notes);
+      notesArray = notes;
+
+      addPendingOp({ type: 'set', id: newId, data: { ...newNote } });
+
+      openEditModal(newNote);
+      renderCurrentView();
+    } finally {
+      isCreating = false;
+    }
+  }
+
+  function openEditModal(note) {
+    // 🔧 BUG FIX: Null check for modal elements
+    const modal = document.getElementById('noteModal');
+    const titleInp = document.getElementById('noteTitle');
+    const contentInp = document.getElementById('noteContent');
+    if (!modal || !titleInp || !contentInp) {
+      console.warn('openEditModal: modal elements not found in DOM');
+      return;
+    }
+    editingNoteId = note.id;
+    titleInp.value = note.title || '';
+    contentInp.value = note.content || '';
+    modal.style.display = 'flex';
+  }
+
+  async function closeModalAndSave() {
+    const modal = document.getElementById('noteModal');
+    if (!modal) return;
+
+    if (editingNoteId && currentUser) {
+      const titleEl = document.getElementById('noteTitle');
+      const contentEl = document.getElementById('noteContent');
+      const title = titleEl ? titleEl.value : '';
+      const content = contentEl ? contentEl.value : '';
+      const now = Date.now();
+      const savingId = editingNoteId;
+
+      // 🔧 BUG FIX: Clear modal state immediately so stale ID can never linger
+      modal.style.display = 'none';
+      editingNoteId = null;
+
+      let notes = getLocalNotes();
+      const idx = notes.findIndex(n => n.id === savingId);
+
+      if ((!title || title.trim() === '') && (!content || content.trim() === '')) {
+        // Empty note: delete locally and remove pending op
+        notes = notes.filter(n => n.id !== savingId);
+        saveLocalNotes(notes);
+        notesArray = notes;
+        const ops = getPendingOps();
+        const wasPending = ops.find(o => o.id === savingId && o.type === 'set');
+        if (wasPending) {
+          removePendingOp(savingId);
+        } else {
+          addPendingOp({ type: 'delete', id: savingId });
+        }
+        showToast('✨ Empty note discarded', 'success');
+      } else {
+        const updatedNote = {
+          ...(idx >= 0 ? notes[idx] : {}),
+          id: savingId,
+          title: title.trim() || 'Untitled',
+          content: content,
+          updatedAt: now
+        };
+        if (idx >= 0) notes[idx] = updatedNote;
+        else notes.unshift(updatedNote);
+        saveLocalNotes(notes);
+        notesArray = notes;
+
+        addPendingOp({ type: 'update', id: savingId, data: { title: updatedNote.title, content: updatedNote.content, isPinned: updatedNote.isPinned, isArchived: updatedNote.isArchived, isTrashed: updatedNote.isTrashed, createdAt: updatedNote.createdAt } });
+        showToast('💾 Saved locally', 'success');
+      }
+      renderCurrentView();
+      updateSyncBadge();
+      return;
+    }
+
+    modal.style.display = 'none';
+    editingNoteId = null;
+  }
+
+  async function renderSettingsPanel(container) {
+    const userEmail = currentUser?.email || '—';
+    container.innerHTML = `
+      <div class="settings-card">
+        <h2 style="margin-bottom: 1rem;">⚙️ Settings</h2>
+        <div class="info-row"><strong>📧 Email</strong><br>${escapeHtml(userEmail)}</div>
+        <div class="password-section">
+          <h3>🔐 Change Password</h3>
+          <input type="password" id="currentPassword" placeholder="Current Password">
+          <input type="password" id="newPassword" placeholder="New Password (min 6 chars)">
+          <button id="changePwdBtn">Change Password</button>
+          <div id="pwdMessage" class="message" style="display:none;"></div>
+        </div>
+        <div style="margin-top: 30px;"><button id="logoutSettingsBtn" class="danger-btn">🚪 Logout</button></div>
+      </div>
+    `;
+    
+    document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+      const currentPwd = document.getElementById('currentPassword').value;
+      const newPwd = document.getElementById('newPassword').value;
+      const msgDiv = document.getElementById('pwdMessage');
+      if (!currentPwd || !newPwd) {
+        msgDiv.textContent = "Please fill both fields";
+        msgDiv.className = "message error";
+        msgDiv.style.display = 'block';
+        return;
+      }
+      if (newPwd.length < 6) {
+        msgDiv.textContent = "Password must be at least 6 characters";
+        msgDiv.className = "message error";
+        msgDiv.style.display = 'block';
+        return;
+      }
+      try {
+        const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPwd);
+        await currentUser.reauthenticateWithCredential(credential);
+        await currentUser.updatePassword(newPwd);
+        msgDiv.textContent = "✅ Password updated!";
+        msgDiv.className = "message success";
+        msgDiv.style.display = 'block';
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        setTimeout(() => msgDiv.style.display = 'none', 3000);
+      } catch (err) {
+        msgDiv.textContent = err.code === 'auth/wrong-password' ? "❌ Incorrect password" : err.message;
+        msgDiv.className = "message error";
+        msgDiv.style.display = 'block';
+        setTimeout(() => msgDiv.style.display = 'none', 3000);
+      }
+    });
+    
+    document.getElementById('logoutSettingsBtn')?.addEventListener('click', () => {
+      cleanup();
+      auth.signOut();
+    });
+  }
+
+  function toggleSidebar(open) {
+    const overlay = document.getElementById('sidebarOverlay');
+    const sidebar = document.getElementById('sidebar');
+    if (!overlay || !sidebar) return;
+    if (open) {
+      sidebar.classList.add('open');
+      overlay.classList.add('active');
+    } else {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    }
+  }
+
+  function buildMainUI() {
+    if (!rootEl) return;
+    
+    rootEl.innerHTML = `
+      <div class="app-main">
+        <div class="top-bar">
+          <div class="menu-icon" id="menuIcon"><i class="fas fa-bars"></i></div>
+          <div class="app-logo"><i class="fas fa-cloud"></i><span>CloudKeep</span></div>
+          <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchInput" placeholder="Search notes..."></div>
+        </div>
+        <div id="mainContentArea"></div>
+        <div class="fab" id="newNoteFab"><i class="fas fa-plus"></i></div>
+      </div>
+      <div id="noteModal" class="modal">
+        <div class="modal-content">
+          <input type="text" id="noteTitle" placeholder="Title">
+          <textarea id="noteContent" placeholder="Take a note..."></textarea>
+          <div class="modal-actions">
+            <button id="cancelModalBtn" class="cancel-modal-btn">Cancel</button>
+            <button id="saveModalBtn" class="save-btn">Done</button>
+          </div>
+        </div>
+      </div>
+      <div id="sidebarOverlay" class="sidebar-overlay"></div>
+      <div id="sidebar" class="sidebar">
+        <div class="close-sidebar-btn" id="closeSidebarBtn"><i class="fas fa-times"></i></div>
+        <div class="sidebar-item" data-nav="notes"><i class="fas fa-sticky-note"></i> Notes</div>
+        <div class="sidebar-item" data-nav="archive"><i class="fas fa-archive"></i> Archive</div>
+        <div class="sidebar-item" data-nav="trash"><i class="fas fa-trash"></i> Trash</div>
+        <div class="sidebar-item theme-toggle-sidebar" id="sidebarThemeToggle"><i class="fas fa-moon"></i> Dark / Light</div>
+        <div class="sidebar-item" data-nav="settings"><i class="fas fa-cog"></i> Settings</div>
+      </div>
+    `;
+    
+    document.getElementById('menuIcon').onclick = () => toggleSidebar(true);
+    document.getElementById('closeSidebarBtn').onclick = () => toggleSidebar(false);
+    document.getElementById('sidebarOverlay').onclick = () => toggleSidebar(false);
+    document.getElementById('newNoteFab').onclick = () => createNewNote();
+    document.getElementById('cancelModalBtn').onclick = () => closeModalAndSave();
+    document.getElementById('saveModalBtn').onclick = () => closeModalAndSave();
+    document.getElementById('sidebarThemeToggle').onclick = () => { toggleTheme(); toggleSidebar(false); };
+    
+    document.querySelectorAll('.sidebar-item[data-nav]').forEach(el => {
+      el.onclick = () => { 
+        currentView = el.dataset.nav; 
+        searchQuery = ''; 
+        const inp = document.getElementById('searchInput'); 
+        if(inp) inp.value = ''; 
+        renderCurrentView(); 
+        toggleSidebar(false); 
+      };
+    });
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => { 
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          searchQuery = e.target.value;
+          renderCurrentView();
+        }, 300);
+      });
+    }
+    
+    renderCurrentView();
+    attachNotesListener();
+    
+    setTimeout(() => updateConnectionStatus(), 100);
+  }
+
+  function renderAuth() {
+    if (!rootEl) return;
+    
+    let isLogin = true;
+    rootEl.innerHTML = `
+      <div class="auth-wrapper">
+        <div class="auth-container">
+          <div class="auth-logo"><i class="fas fa-cloud"></i><h2>CloudKeep</h2></div>
+          <div id="dynamicAuthForm">
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button id="authSubmitBtn">Sign In</button>
+            <div class="auth-footer">
+              <span id="forgotPwdLink">Forgot Password?</span>
+              <span id="toggleAuthMode">Create account →</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const refreshForm = () => {
+      const container = document.getElementById('dynamicAuthForm');
+      if (!container) return;
+      if (isLogin) {
+        container.innerHTML = `<input type="email" id="email" placeholder="Email"><input type="password" id="password" placeholder="Password"><button id="authSubmitBtn">Sign In</button><div class="auth-footer"><span id="forgotPwdLink">Forgot Password?</span><span id="toggleAuthMode">Create account →</span></div>`;
+      } else {
+        container.innerHTML = `<input type="text" id="name" placeholder="Full Name"><input type="tel" id="phone" placeholder="Phone"><input type="email" id="email" placeholder="Email"><input type="password" id="password" placeholder="Password"><button id="authSubmitBtn">Create Account</button><div class="auth-footer"><span id="toggleAuthMode">← Back to Login</span></div>`;
+      }
+      attachEvents();
+    };
+    
+    const attachEvents = () => {
+      const submitBtn = document.getElementById('authSubmitBtn');
+      if (submitBtn) {
+        submitBtn.onclick = async () => {
+          const email = document.getElementById('email')?.value.trim();
+          const pass = document.getElementById('password')?.value;
+          if (!email || !pass) return showToast('Email/Password required', 'error');
+          try {
+            if (isLogin) {
+              await auth.signInWithEmailAndPassword(email, pass);
+            } else {
+              const name = document.getElementById('name')?.value.trim();
+              const phone = document.getElementById('phone')?.value.trim();
+              if (!name || !phone) return showToast('Name and phone required', 'error');
+              const userCred = await auth.createUserWithEmailAndPassword(email, pass);
+              await db.collection('users').doc(userCred.user.uid).set({ name, phone, email });
+              showToast('Account created!', 'success');
+            }
+          } catch (err) { showToast(err.message, 'error'); }
+        };
+      }
+      
+      const toggleBtn = document.getElementById('toggleAuthMode');
+      if (toggleBtn) {
+        toggleBtn.onclick = () => { isLogin = !isLogin; refreshForm(); };
+      }
+      
+      const forgotLink = document.getElementById('forgotPwdLink');
+      if (forgotLink) {
+        forgotLink.onclick = async () => {
+          const email = document.getElementById('email')?.value.trim();
+          if (!email) return showToast('Enter email then Click forget', 'error');
+          try {
+            await auth.sendPasswordResetEmail(email);
+            showToast('Reset link sent!', 'success');
+          } catch (err) { showToast(err.message, 'error'); }
+        };
+      }
+    };
+    attachEvents();
+    
+    setTimeout(() => updateConnectionStatus(), 100);
+  }
+
+  function startApp() {
+    setTimeout(() => {
+      const splash = document.getElementById('splash');
+      if (splash) splash.style.display = 'none';
+      rootEl = document.getElementById('appRoot');
+      updateLastSyncTime();
+      
+      auth.onAuthStateChanged(user => {
+        currentUser = user;
+        if (user) {
+          cleanup();
+          buildMainUI();
+          notesArray = getLocalNotes();
+          updateSyncBadge();
+        } else { 
+          if (unsubscribeNotes) {
+            unsubscribeNotes();
+            unsubscribeNotes = null;
+          }
+          renderAuth(); 
+        }
+      });
+    }, 2500);
+  }
+
+  window.onload = () => {
+    applyTheme();
+    startApp();
+  };
+</script>
+</body>
+</html>
